@@ -1,20 +1,14 @@
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { View, Text, SafeAreaView, LogBox } from "react-native";
+import React, { useEffect } from "react";
+import AppNavigation from "./src/navigation/index";
+import { apiCall } from "./src/api/openAI";
 
 export default function App() {
-  return (
-    <View style={styles.container}>
-      <Text>Open up App.js to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
-  );
-}
+  LogBox.ignoreLogs(["new NativeEventEmitter"]); // Ignore log notification by message
+  LogBox.ignoreAllLogs(); //Ignore all log notifications
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
+  useEffect(() => {
+    apiCall("create an image with a dog playing with cat");
+  }, []);
+  return <AppNavigation />;
+}
