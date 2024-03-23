@@ -21,22 +21,10 @@ axiosRetry(client, {
 const chatgptendpoint = "https://api.openai.com/v1/chat/completions";
 const dalleendpoint = "https://api.openai.com/v1/images/generations";
 
-let requestCount = 0;
-let lastRequestTimestamp = Date.now();
 
-const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const makeRequest = async (prompt, messages) => {
+export const apiCall = async (prompt, messages) => {
   try {
-    const now = Date.now();
-    const elapsed = now - lastRequestTimestamp;
-
-    if (elapsed < TIME_PERIOD && requestCount >= MAX_REQUESTS) {
-      // Wait until the time period is over before making additional requests
-      const remainingTime = TIME_PERIOD - elapsed;
-      await delay(remainingTime);
-    }
-
     const res = await client.post(chatgptendpoint, {
       model: "gpt-3.5-turbo",
       messages: [
@@ -46,31 +34,52 @@ const makeRequest = async (prompt, messages) => {
         }
       ]
     });
-
-    requestCount++;
-    lastRequestTimestamp = Date.now();
-
-    console.log("data ", res.data.choices[0].message);
-    return res.data.choices[0].message;
-  } catch (error) {
-    console.log("error: ", error);
-
-    // Retry only if it's a 429 error
-    if (axiosRetry.isRetryableError(error) && error.response.status === 429) {
-      const retryAfter = parseInt(error.response.headers["retry-after"]) || 1;
-      await delay(retryAfter * 1000); // Convert seconds to milliseconds
-      return makeRequest(prompt, messages); // Retry the request
+    let isArt= res.data?.choices[0]?.message?.content;
+    if(isArt.toLowercase().includes('yes')){
+      console.log('dall-e api call')
+      return dalleApiCall(prompt,messages || []);
+    }else{
+      console.log('chat gpt api call')
+      return chatgptApicall(prompt,messages || []);
     }
-
-    return { success: false, msg: error.message };
-  }
-};
-
-export const apiCall = async (prompt, messages) => {
-  try {
-    const response = await makeRequest(prompt, messages);
-    return { success: true, msg: response };
+    
+    
   } catch (error) {
-    return { success: false, msg: error.message };
+    console.log('error :', error)
+    return Promise.resolve({success: false,msg:error.messages})
   }
 };
+
+const chatgptApicall = async(prompt,messages)=>{
+  try{
+    const res = await client.post(chatgptendpoint, {
+      model: "gpt-3.5-turbo",
+      messages
+        
+    });
+
+    let answer = res.data?.choices[0]?.message?.content;
+    messages.push({role: 'assistant',content: answer.trim()});
+    return Promise.resolve({success: true, data:messages})
+  }catch(err){
+    console.log('error :',err);
+    return Promise.resolve({success:false,msg:err.message})
+  }
+}
+
+const dalleApiCall=async(prompt,messages)=>{
+  try {
+    const res=await client.post(dalleendpoint, {
+      prompt,
+      n: 1,
+      size: "512x512"
+    })
+
+    let url = res?.data?.data[0]?.url;
+    console.log('got url of the image: ',url)
+    return Promise.resolve({success: true, data:messages})
+  } catch (error) {
+    console.log('error :',error)
+    return Promise.resolve({success:false,msg:err.message})
+  }
+}
